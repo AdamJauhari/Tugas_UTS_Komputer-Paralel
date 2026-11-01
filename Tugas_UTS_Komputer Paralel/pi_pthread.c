@@ -10,8 +10,17 @@
  *   - Slot hasil diberi padding 64 byte agar tidak terjadi false sharing.
  */
 #include <pthread.h>
+#include <stdlib.h>
 #include "common.h"
 #include "report.h"
+
+#if defined(_WIN32) && !defined(aligned_alloc)
+#define my_aligned_alloc(align, size) _aligned_malloc((size), (align))
+#define my_aligned_free(ptr) _aligned_free(ptr)
+#else
+#define my_aligned_alloc(align, size) aligned_alloc((align), (size))
+#define my_aligned_free(ptr) free(ptr)
+#endif
 
 typedef struct {
     int      tid;
@@ -32,7 +41,7 @@ int main(int argc, char **argv) {
     parse_args(argc, argv, &N, &T, &csv);
 
     pthread_t *th = malloc(sizeof(pthread_t) * T);
-    task_t *tasks = aligned_alloc(64, sizeof(task_t) * T);
+    task_t *tasks = my_aligned_alloc(64, sizeof(task_t) * T);
     for (int i = 0; i < T; i++) {
         tasks[i].tid = i;
         tasks[i].n = chunk_size(N, T, i);
@@ -51,6 +60,6 @@ int main(int argc, char **argv) {
     double t1 = now_sec();
 
     report("pthread", T, N, hits, t1 - t0, csv);
-    free(th); free(tasks);
+    free(th); my_aligned_free(tasks);
     return 0;
 }
